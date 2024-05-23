@@ -12,10 +12,58 @@ SELECT *
 FROM information_schema.columns
 WHERE table_name = 'trips';
 
+/** Filter out trips < 60 seconds **/
+DELETE FROM trips
+WHERE ended_at - started_at <= INTERVAL '60 seconds';
+
 /** Converting started_at and ended_at to timestamp **/
 ALTER TABLE trips
 ALTER COLUMN started_at SET DATA TYPE TIMESTAMP USING started_at::TIMESTAMP,
 ALTER COLUMN ended_at SET DATA TYPE TIMESTAMP USING ended_at::TIMESTAMP;
+
+/** Adding a new column for ride duration **/
+ALTER TABLE trips
+ADD COLUMN ride_duration INTERVAL;
+
+UPDATE trips
+SET ride_duration = ended_at - started_at;
+
+/** Verifying the update **/
+SELECT
+    ride_id,
+    started_at,
+    ended_at,
+    ride_duration 
+FROM trips
+LIMIT 10;
+
+/** Adding a new column for ride distance **/
+ALTER TABLE trips
+ADD COLUMN ride_distance DOUBLE PRECISION;
+
+UPDATE trips
+SET ride_distance = (
+    6371 * ACOS(
+        LEAST(
+            1.0,
+            GREATEST(
+                -1.0,
+                SIN(RADIANS(start_lat)) * SIN(RADIANS(end_lat)) +
+                COS(RADIANS(start_lat)) * COS(RADIANS(end_lat)) * 
+                COS(RADIANS(start_lng - end_lng))
+            )
+        )
+    )
+);
+
+/** Verifying the update **/
+SELECT
+    ride_id,
+    ride_distance,
+    ride_duration
+FROM trips
+LIMIT 10;
+
 
 /** Confirming conversion of data types **/
 SELECT *
@@ -45,6 +93,59 @@ SELECT
     COUNT(*) AS total_rides
 FROM trips;
 
+/** Average ride duration **/
+SELECT
+    AVG(ride_duration) AS avg_ride_duration
+FROM trips;
+
+/** Minimum, maximum, and average ride duration **/
+SELECT
+    MIN(ride_duration) AS min_ride_duration,
+    MAX(ride_duration) AS max_ride_duration,
+    AVG(ride_duration) AS avg_ride_duration
+FROM trips;
+
+/** Identify rides with negative duration **/
+SELECT
+    ride_id,
+    started_at,
+    ended_at,
+    (ended_at - started_at) AS ride_duration
+FROM trips
+WHERE (ended_at - started_at) < INTERVAL '0 seconds';
+
+/** Average ride distance **/
+SELECT
+    AVG(ride_distance) AS avg_ride_distance
+FROM trips;
+
+/** Average ride duration by member type **/
+SELECT
+    member_casual,
+    AVG(ride_duration) AS avg_ride_duration
+FROM trips
+GROUP BY member_casual;
+
+/** Average ride distance by member type **/
+SELECT
+    member_casual,
+    AVG(ride_distance) AS avg_ride_distance
+FROM trips
+GROUP BY member_casual;
+
+/** Average ride duration by rideable type **/
+SELECT
+    rideable_type,
+    AVG(ride_duration) AS avg_ride_duration
+FROM trips
+GROUP BY rideable_type;
+
+/** Average ride distance by rideable type **/
+SELECT
+    rideable_type,
+    AVG(ride_distance) AS avg_ride_distance
+FROM trips
+GROUP BY rideable_type;
 
 /** Count of distinct rides by ride_id **/
 SELECT
@@ -199,10 +300,40 @@ GROUP BY year_of_ride, start_station_name
 ORDER BY year_of_ride, start_station_name
 
 /** Finding ride counts per month and start station **/
+SELECT
+    EXTRACT(MONTH FROM started_at) AS month_of_ride,
+    start_station_name,
+    COUNT(*) AS monthly_rides
+FROM trips
+GROUP BY month_of_ride, start_station_name
+ORDER BY month_of_ride, start_station_name;
 
 /** Finding ride counts per day of the week and start station **/
+SELECT
+    EXTRACT(DOW FROM started_at) AS day_of_ride,
+    start_station_name,
+    COUNT(*) AS daily_rides
+FROM trips
+GROUP BY day_of_ride, start_station_name
+ORDER BY day_of_ride, start_station_name;
 
 /** Finding ride counts per hour of the day and start station **/
+SELECT
+    EXTRACT(HOUR FROM started_at) AS hour_of_ride,
+    start_station_name,
+    COUNT(*) AS hourly_rides
+FROM trips
+GROUP BY hour_of_ride, start_station_name
+ORDER BY hour_of_ride, start_station_name;
+
+/** Average ride duration per year **/
+SELECT
+    EXTRACT(YEAR FROM started_at) AS ride_year,
+    AVG(ride_duration) AS avg_ride_duration
+FROM trips
+GROUP BY ride_year
+ORDER BY ride_year;
+
 
 /** Finding ride counts per year and start station - using CTEs **/
 WITH yearly_counts AS (
@@ -224,10 +355,36 @@ FROM (
         year_of_ride,
         start_station_name,
         yearly_rides,
-        ROW_NUMBER() OVER (PARTITION BY year_of_ride
-        ORDER BY yearly_rides DESC) AS row_num
+        ROW_NUMBER() OVER (PARTITION BY year_of_ride ORDER BY yearly_rides DESC) AS row_num
     FROM yearly_counts
 ) ranked_yearly_counts
 
 WHERE row_num <= 10
 ORDER BY year_of_ride, row_num;
+
+/** Finding ride counts per month and start station - using CTEs **/
+WITH monthly_counts AS (
+    SELECT
+        EXTRACT(MONTH FROM started_at) AS month_of_ride,
+        start_station_name,
+        COUNT(*) AS monthly_rides
+    FROM trips
+    GROUP BY month_of_ride, start_station_name
+)
+
+SELECT
+    month_of_ride,
+    start_station_name,
+    monthly_rides
+
+FROM (
+    SELECT
+        month_of_ride,
+        start_station_name,
+        monthly_rides,
+        ROW_NUMBER() OVER (PARTITION BY month_of_ride ORDER BY monthly_rides DESC) AS row_num
+    FROM monthly_counts
+) ranked_monthly_counts
+
+WHERE row_num <= 10
+ORDER BY month_of_ride, row_num;
