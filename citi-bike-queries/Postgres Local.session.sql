@@ -64,7 +64,6 @@ SELECT
 FROM trips
 LIMIT 10;
 
-
 /** Confirming conversion of data types **/
 SELECT *
 FROM information_schema.columns
