@@ -198,3 +198,112 @@ INNER JOIN populations AS p2
 ON p1.country_code = p2.country_code
 WHERE p1.year = 2010
     AND p2.year = 2015;
+
+-- UNION - Returns all records from both tables
+-- UNION ALL - Returns all records from both tables, and it duplicates records if they exist in both tables.
+
+-- UNION
+SELECT 
+    monarch AS leader, 
+    country
+FROM monarchs
+UNION
+SELECT
+    prime_minister, country
+FROM prime_ministers
+ORDER BY country, leader
+LIMIT 10;
+
+-- UNION ALL
+SELECT 
+    monarch AS leader, 
+    country
+FROM monarchs
+UNION ALL
+SELECT
+    prime_minister, country
+FROM prime_ministers
+ORDER BY country, leader
+LIMIT 10;
+
+-- Comparing global economies
+SELECT *
+FROM economies2015
+UNION
+SELECT *
+FROM economies2019
+ORDER BY code, year;
+
+SELECT 
+    code,
+    year 
+FROM economies
+UNION ALL
+SELECT 
+    country_code,
+    year
+FROM populations
+
+-- INTERSECT
+SELECT
+    name
+FROM cities
+INTERSECT
+SELECT
+    name
+FROM countries;
+
+-- EXCEPT
+SELECT
+    name
+FROM cities
+EXCEPT
+SELECT
+    name
+FROM countries;
+
+-- Subqueries
+-- Subqueries are queries nested within another query.
+-- Subqueries can be used in SELECT, FROM, WHERE, and JOIN clauses.
+-- Subqueries can return individual values or a list of records.
+
+-- Subquery in SELECT
+SELECT
+    name,
+    (SELECT COUNT(*)
+     FROM cities
+     WHERE countries.code = cities.country_code) AS cities_num
+FROM countries;
+
+-- Subquery in WHERE
+SELECT president, country, continent
+FROM presidents
+WHERE continent IN (
+    SELECT continent
+    FROM countries
+    WHERE indep_year < 1800
+);
+
+-- Antijoin
+-- Antijoin returns rows from the first table that do not have a match in the second table.
+SELECT
+    country,
+    president 
+FROM presidents
+WHERE continent LIKE '%America'
+    AND country NOT IN (
+        SELECT country
+        FROM states
+    WHERE indep_year < 1800
+    );
+
+SELECT 
+    DISTINCT name, 
+    COUNT(name) AS count
+FROM languages
+WHERE code IN (
+    SELECT code
+    FROM countries
+    WHERE region = 'Middle East')
+GROUP BY name
+ORDER BY name;
