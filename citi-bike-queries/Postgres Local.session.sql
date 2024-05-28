@@ -388,3 +388,78 @@ FROM (
 WHERE row_num <= 10
 ORDER BY month_of_ride, row_num;
 
+-- Finding ride counts per day of the week and bike type - using CTEs
+WITH daily_counts AS (
+    SELECT 
+        EXTRACT (DOW FROM started_at) AS day_of_week_ride,
+        rideable_type,
+        COUNT(*) AS daily_rides
+    FROM trips
+    GROUP BY day_of_week_ride, rideable_type
+)
+
+SELECT
+    day_of_week_ride,
+    rideable_type,
+    daily_rides
+
+FROM (
+    SELECT
+        day_of_week_ride,
+        rideable_type,
+        daily_rides,
+        ROW_NUMBER() OVER (PARTITION BY day_of_week_ride ORDER BY daily_rides DESC) AS row_num
+    FROM daily_counts
+) ranked_daily_counts
+ORDER BY day_of_week_ride, row_num;
+
+-- Grouping the riders by duration of rides
+SELECT
+    ride_id,
+    member_casual,
+    ride_duration,
+CASE
+    WHEN ride_duration <= 30 THEN 'Beginner Rider'
+    WHEN ride_duration > 30 AND ride_duration <= 60 THEN 'Intermediate Rider'
+    WHEN ride_duration > 60 AND ride_duration <= 90 THEN 'Advanced Rider'
+    ELSE 'Expert Rider'
+END AS rider_group
+FROM trips;
+
+-- Getting the number of beginner, intermediate, advanced, and expert riders
+SELECT
+    rider_group,
+    COUNT(*) AS rider_count
+FROM (
+    SELECT
+        ride_id,
+        member_casual,
+        ride_duration,
+    CASE
+        WHEN ride_duration <= 30 THEN 'Beginner Rider'
+        WHEN ride_duration > 30 AND ride_duration <= 60 THEN 'Intermediate Rider'
+        WHEN ride_duration > 60 AND ride_duration <= 90 THEN 'Advanced Rider'
+        ELSE 'Expert Rider'
+    END AS rider_group
+    FROM trips
+) grouped_riders
+GROUP BY rider_group;
+
+-- Grouping the riders by distance of rides
+SELECT
+    ride_distance_groups,
+    COUNT(*) AS ride_count
+FROM (
+    SELECT
+        ride_id,
+        member_casual,
+        ride_distance,
+    CASE
+        WHEN ride_distance <= 10 THEN 'Short Ride'
+        WHEN ride_distance > 10 AND ride_distance <= 20 THEN 'Medium Distance Rider'
+        WHEN ride_distance > 20 AND ride_distance <= 30 THEN 'Long Distance Rider'
+        ELSE 'Very Long Distance Rider'
+    END AS ride_distance_groups
+    FROM trips
+) grouped_riders
+GROUP BY ride_distance_groups;
